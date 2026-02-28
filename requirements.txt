@@ -1,0 +1,5 @@
+requests
+beautifulsoup4
+boto3
+python-dotenv
+apache-airflow-providers-apache-spark

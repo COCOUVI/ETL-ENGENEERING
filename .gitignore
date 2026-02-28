@@ -1,0 +1,54 @@
+# Environnements virtuels Python
+env/
+venv/
+.venv/
+ENV/
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE / Editeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Données temporaires ou volumineuses
+*.csv
+*.parquet
+*.json
+data/
+output/
+
+# Variables d'environnement
+.env
+.env.*
+
+# Cache
+.cache/
+*.cache
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+*.jar

@@ -1,0 +1,199 @@
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    # MinIO connection
+    MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    
+    # Spark connection
+    SPARK_MASTER: spark://spark-master:7077
+    # PostgreSQL source
+    SOURCE_DB_CONN: postgresql+psycopg2://sourceuser:sourcepass@postgres-source/sourcedb
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./spark_jobs:/opt/airflow/spark_jobs
+    - ./extractors:/opt/airflow/extractors
+    - ./jobs:/opt/airflow/jobs
+    - ./data:/opt/airflow/data
+    - ./hadoop-aws-3.2.4.jar:/opt/airflow/hadoop-aws-3.2.4.jar
+    - ./aws-java-sdk-bundle-1.11.1026.jar:/opt/airflow/aws-java-sdk-bundle-1.11.1026.jar
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+
+services:
+
+  # ─────────────────────────────────────────────
+  # AIRFLOW
+  # ─────────────────────────────────────────────
+  postgres-airflow:
+    image: postgres:15
+    container_name: postgres-airflow
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  airflow-webserver:
+      <<: *airflow-common
+      container_name: airflow-webserver
+      command: webserver --workers 1 --worker-timeout 300
+      environment:
+        <<: *airflow-common-env
+        AIRFLOW__WEBSERVER__WORKERS: 1
+        AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL: 300
+        AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT: 300
+        AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT: 300
+      ports:
+        - "8080:8080"
+      healthcheck:
+        test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+        start_period: 120s
+      restart: always
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin
+    environment:
+      <<: *airflow-common-env
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # SPARK
+  # ─────────────────────────────────────────────
+  spark-master:
+    image: apache/spark:latest
+    container_name: spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./data:/opt/spark/data
+    restart: always
+
+  spark-worker:
+    image: apache/spark:latest
+    container_name: spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_MEMORY=1g
+      - SPARK_WORKER_CORES=2
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./data:/opt/spark/data
+    depends_on:
+      - spark-master
+    restart: always
+  # ─────────────────────────────────────────────
+  # MINIO (Object Storage - Bronze & Silver Layer)
+  # ─────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console Web
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/raw;
+      mc mb --ignore-existing local/processed;
+      mc mb --ignore-existing local/bronze-layer;
+      mc mb --ignore-existing local/silver-layer;
+      echo 'Buckets créés avec succès';
+      "
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # POSTGRESQL SOURCE (3ème source de données)
+  # ─────────────────────────────────────────────
+  postgres-source:
+    image: postgres:15
+    container_name: postgres-source
+    environment:
+      POSTGRES_USER: sourceuser
+      POSTGRES_PASSWORD: sourcepass
+      POSTGRES_DB: sourcedb
+    ports:
+     - "5433:5432"   # 5433 au lieu de 5432
+    volumes:
+      - postgres_source_data:/var/lib/postgresql/data
+      - ./init_db:/docker-entrypoint-initdb.d   # Scripts SQL d'initialisation
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sourceuser", "-d", "sourcedb"]
+      interval: 10s
+      retries: 5
+    restart: always
+
+volumes:
+  postgres_airflow_data:
+  postgres_source_data:
+  minio_data:
+
+networks:
+  default:
+    name: etl-network

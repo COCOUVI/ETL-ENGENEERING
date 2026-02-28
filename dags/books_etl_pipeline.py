@@ -1,6 +1,5 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from datetime import datetime, timedelta
 
 default_args = {
@@ -29,11 +28,9 @@ with DAG(
         bash_command="python /opt/airflow/jobs/load/load_to_minio.py",
     )
 
-    transform_books = SparkSubmitOperator(
+    transform_books = BashOperator(
         task_id="transform_books",
-        application="/opt/spark/jobs/transform/transform_books.py",
-        conn_id="spark_default",
-        verbose=True,
+        bash_command="python /opt/airflow/jobs/transform/transform_books.py",
     )
 
     scrape_books >> load_raw_to_minio >> transform_books

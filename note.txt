@@ -1,0 +1,1 @@
+En résumé : Le client S3 sert de pont entre ton code Python et MinIO pour que tu puisses utiliser MinIO exactement comme si c’était AWS S3, avec authentification, requêtes simplifiées et gestion d’erreurs.

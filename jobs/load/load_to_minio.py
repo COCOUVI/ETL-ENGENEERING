@@ -25,6 +25,7 @@ load_dotenv(override=False)
 
 RAW_BASE_PATH= Path("/opt/airflow/data/bronze-layer/books")
 
+
 # Dans jobs/load/load_to_minio.py
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER")

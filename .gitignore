@@ -35,7 +35,7 @@ logs/
 *.csv
 *.parquet
 *.json
-data/
+
 output/
 
 # Variables d'environnement

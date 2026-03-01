@@ -5,12 +5,13 @@ Objectifs :
 - Lire les données RAW depuis MinIO (JSON)
 - Nettoyer et typer les données
 - Appliquer des règles de qualité
-- Écrire les données VALIDES en zone PROCESSED
+- Écrire les données VALIDES en zone silver-layer
 - Logger les anomalies sans casser le pipeline
 """
 
 import os
 import logging
+from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 from pyspark.sql import SparkSession
@@ -50,11 +51,11 @@ def ensure_bucket_exists(bucket_name: str):
 
     try:
         s3_client.head_bucket(Bucket=bucket_name)
-        logging.info(f"Bucket '{bucket_name}' already exists ✅")
+        logging.info(f"Bucket '{bucket_name}' already exists ")
     except ClientError:
-        logging.info(f"Bucket '{bucket_name}' not found → creating 🚀")
+        logging.info(f"Bucket '{bucket_name}' not found → creating ")
         s3_client.create_bucket(Bucket=bucket_name)
-        logging.info(f"Bucket '{bucket_name}' created successfully ✅")
+        logging.info(f"Bucket '{bucket_name}' created successfully")
 
 
 def s3_folder_exists(s3_client, bucket, prefix):
@@ -97,9 +98,9 @@ def create_spark_session() -> SparkSession:
 
 def read_raw_books(spark: SparkSession):
     """
-    Lecture des fichiers RAW depuis MinIO
+    Lecture des fichiers bronze-layer depuis MinIO
     """
-    path = "s3a://raw/books/books_*.json"
+    path = "s3a://bronze-layer/books/books_*.json"
     logging.info(f"Reading RAW data from {path}")
 
     return (
@@ -164,15 +165,15 @@ def apply_data_quality_checks(df):
     return valid_df, invalid_df
 
 
-def write_processed_books(df_valid):
+def write_silver_layer_books(df_valid):
     """
-    Écriture des données VALIDES en zone PROCESSED
+    Écriture des données VALIDES en zone silver-layer
     (MinIO + local)
     """
-    s3_output = "s3a://processed/books/"
-    local_output = "data/processed/books/"
+    s3_output = "s3a://silver-layer/books/"
+    local_output = Path("/opt/airflow/data/silver-layer/books")
 
-    ensure_bucket_exists("processed")
+    ensure_bucket_exists("silver-layer")
 
     s3_client = boto3.client(
         "s3",
@@ -183,19 +184,19 @@ def write_processed_books(df_valid):
     )
 
     # --- MinIO ---
-    if not s3_folder_exists(s3_client, "processed", "books/"):
-        logging.info(f"Writing processed data to {s3_output}")
+    if not s3_folder_exists(s3_client, "silver-layer", "books/"):
+        logging.info(f"Writing silver-layer data to {s3_output}")
         df_valid.write.mode("overwrite").parquet(s3_output)
     else:
-        logging.info("[SKIP] Processed data already exists in MinIO")
+        logging.info("[SKIP] silver-layer data already exists in MinIO")
 
     # --- Local ---
     if not os.path.exists(local_output) or not os.listdir(local_output):
-        logging.info(f"Writing processed data locally to {local_output}")
+        logging.info(f"Writing silver-layer data locally to {local_output}")
         os.makedirs(local_output, exist_ok=True)
-        df_valid.write.mode("overwrite").parquet(local_output)
+        df_valid.write.mode("overwrite").parquet(str(local_output)) # don't accept path object because to convert str due to parquet 
     else:
-        logging.info("[SKIP] Processed data already exists locally")
+        logging.info("[SKIP] silver-layer data already exists locally")
 
 # ============================================================
 # MAIN
@@ -205,25 +206,25 @@ if __name__ == "__main__":
 
     spark = create_spark_session()
 
-    # 1️⃣ READ
+    # 1️READ
     df_raw = read_raw_books(spark)
     df_raw.show(5, truncate=False)
 
-    # 2️⃣ CLEAN
+    # 2️CLEAN
     df_clean = clean_books(df_raw)
     df_clean.show(5, truncate=False)
 
-    # 3️⃣ QUALITY
+    # 3️ QUALITY
     df_valid, df_invalid = apply_data_quality_checks(df_clean)
 
     if df_invalid.count() > 0:
         logging.warning("Some invalid records were detected")
         df_invalid.show(5, truncate=False)
 
-    # 4️⃣ WRITE
-    write_processed_books(df_valid)
+    # 4️ WRITE
+    write_silver_layer_books(df_valid)
 
-    # 5️⃣ SCHEMA
+    # 5️ SCHEMA
     df_valid.printSchema()
 
     spark.stop()

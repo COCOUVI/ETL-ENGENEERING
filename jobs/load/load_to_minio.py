@@ -23,13 +23,13 @@ load_dotenv(override=False)
 # CONFIGURATION
 # =========================
 
-RAW_BASE_PATH= Path("/opt/airflow/data/raw/books")
+RAW_BASE_PATH= Path("/opt/airflow/data/bronze-layer/books")
 
 # Dans jobs/load/load_to_minio.py
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER")
 MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD")
-MINIO_BUCKET = "raw"
+MINIO_BUCKET = "bronze-layer"
 
 # Logging standard industriel
 logging.basicConfig(

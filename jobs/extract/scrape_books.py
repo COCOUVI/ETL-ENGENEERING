@@ -14,7 +14,7 @@ BASE_URL = "https://books.toscrape.com/catalogue/page-{}.html"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # Dossier de sortie pour les données RAW
-RAW_DATA_PATH = Path("/opt/airflow/data/raw/books")
+RAW_DATA_PATH= Path("/opt/airflow/data/bronze-layer/books")
 RAW_DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 # Configuration du logging (standard industriel)

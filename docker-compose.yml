@@ -86,6 +86,8 @@ services:
     command:
       - -c
       - |
+        mkdir -p /opt/airflow/data/bronze-layer/books
+        mkdir -p /opt/airflow/data/silver-layer
         airflow db init
         airflow users create \
           --username admin \

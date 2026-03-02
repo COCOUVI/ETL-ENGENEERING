@@ -37,6 +37,7 @@ logging.basicConfig(
 # MINIO / S3 HELPERS
 # ============================================================
 
+
 def ensure_bucket_exists(bucket_name: str):
     """
     Vérifie l'existence d'un bucket MinIO, le crée si nécessaire

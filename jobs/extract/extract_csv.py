@@ -36,7 +36,7 @@ def extract_to_csv():
         BRONZE_OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
         output_file = BRONZE_OUTPUT_PATH / f"books_csv_{datetime.utcnow().date()}.csv"
-        df.to_csv(output_file, index=False)
+        df.to_csv(output_file, index=False, sep=";")
         logging.info(f"Saved to {output_file}")
 
     except Exception as e:

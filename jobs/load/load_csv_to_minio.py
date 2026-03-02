@@ -3,8 +3,9 @@ import logging
 from pathlib import Path
 
 import boto3
-
+from botocore.exceptions import ClientError
 from  dotenv import load_dotenv
+import os
 
 
 load_dotenv(override=False)
@@ -29,7 +30,7 @@ def get_S3_client():
     """
       Creer un CLIENT S3 COMPATIBLE 
     """
-    return boto3.Client(
+    return boto3.client(
         "s3",
         endpoint_url=MINIO_ENDPOINT,
         aws_access_key_id=MINIO_ACCESS_KEY,
@@ -50,16 +51,33 @@ def ensure_bucket_exists(s3_client):
         logging.info(f"Bucket '{MINIO_BUCKET}' created")
 
 
-def upload_raw_files():
+def upload_raw_file():
     """
-    Upload tous les fichiers RAW locaux vers MinIO
-    en conservant la structure des dossiers
+    Upload un seul fichier RAW vers MinIO
     """
     s3 = get_S3_client()
     ensure_bucket_exists(s3)
-    # relative_path = fi    
+
+    # trouver le fichier sans connaître son nom
+    file_path = next(RAW_PATH.rglob("*.csv"), None)
+
+    if not file_path:
+        logging.warning("Aucun fichier CSV trouvé dans RAW_PATH")
+        return
+
+    relative_path = file_path.relative_to(RAW_PATH)
+    s3_key = f"books/{relative_path}"
+
+    try:
+        s3.upload_file(
+            Filename=str(file_path),
+            Bucket=MINIO_BUCKET,
+            Key=s3_key
+        )
+        logging.info(f"Uploaded {file_path} → s3://{MINIO_BUCKET}/{s3_key}")
+    except Exception as e:
+        logging.error(f"Failed to upload {file_path}: {e}")
 
 
-
-
-
+if __name__ == "__main__":
+    upload_raw_file()

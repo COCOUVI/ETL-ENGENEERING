@@ -30,7 +30,7 @@ def extract_to_csv():
     """
     try:
         logging.info(f"Reading CSV from {CSV_SOURCE_PATH}")
-        df = pd.read_csv(CSV_SOURCE_PATH, sep=";", encoding="latin-1", on_bad_lines="skip")
+        df = pd.read_csv(CSV_SOURCE_PATH, sep=",", encoding="latin-1", on_bad_lines="skip", quotechar='"')
         logging.info(f"CSV loaded : {len(df)} rows")
 
         BRONZE_OUTPUT_PATH.mkdir(parents=True, exist_ok=True)

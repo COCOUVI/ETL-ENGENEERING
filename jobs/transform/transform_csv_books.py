@@ -17,6 +17,8 @@ from botocore.exceptions import ClientError
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import  col, when,substring
 from dotenv import load_dotenv
+from pyspark.sql.types import IntegerType
+
 
 
 load_dotenv(override=False)
@@ -97,41 +99,52 @@ def create_spark_session() -> SparkSession:
     )
 
 def read_raw_books(spark: SparkSession):
-    """
-    Lecture des fichiers bronze-layer depuis MinIO
-    """
     path = "s3a://bronze-layer/books/books_*.csv"
     logging.info(f"Reading RAW data from {path}")
 
     return (
         spark.read
         .option("header", "true")
-        .option("sep", ",")
+        .option("sep", ";")
+        .option("mode", "PERMISSIVE")
         .csv(path)
     )
+
+
 def clean_books(df_raw):
-    """
-    Nettoyage et typage des données
-    """
     logging.info("Cleaning books data")
-    current_year=2026
+
+    current_year = 2026
+
+    # 1️⃣ cast propre
     df = df_raw.withColumn(
-        "Year-Of-Publication",
-        when((col("Year-Of-Publication").cast("int") < 1000) | 
-            (col("Year-Of-Publication").cast("int") > current_year), None)
-        .otherwise(col("Year-Of-Publication").cast("int"))
-    )
-    df = df.withColumn(
-        "Decade",
-        (col("Year-Of-Publication") / 10).cast("int") * 10
+        "Year_Int",
+        col("Year-Of-Publication").cast(IntegerType())
     )
 
+    # 2️⃣ filtre années aberrantes
     df = df.withColumn(
-       "Author_Initial",
-       substring(col("Book-Author"), 1, 1)
+        "Year-Of-Publication",
+        when(
+            (col("Year_Int") < 1000) | (col("Year_Int") > current_year),
+            None
+        ).otherwise(col("Year_Int").cast(IntegerType()))
+    ).drop("Year_Int")
+
+    # 3️⃣ décennie en entier garanti
+    df = df.withColumn(
+        "Decade",
+        (col("Year-Of-Publication") / 10).cast(IntegerType()) * 10
+    )
+
+    # 4️⃣ initial auteur
+    df = df.withColumn(
+        "Author_Initial",
+        substring(col("Book-Author"), 1, 1)
     )
 
     return df
+
 def write_silver_layer_books(df_valid):
     """
     Écriture des données VALIDES en zone silver-layer

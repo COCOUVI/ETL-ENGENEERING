@@ -71,7 +71,13 @@ def extract_to_parquet():
             
             # Sauvegarder en Parquet
             output_file = table_output_path / f"{table_name}_{datetime.utcnow().date()}.parquet"
-            df.to_parquet(output_file, index=False, engine='pyarrow')
+            df.to_parquet(
+                output_file, 
+                index=False, 
+                engine='pyarrow',
+                coerce_timestamps='us',          # ← FIX: Microseconds
+                allow_truncated_timestamps=True  # ← Permet la conversion
+            )
             
             # Afficher la taille du fichier
             file_size = output_file.stat().st_size / 1024  # en KB

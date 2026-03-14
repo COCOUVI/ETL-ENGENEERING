@@ -184,7 +184,7 @@ services:
      - "5433:5432"   # 5433 au lieu de 5432
     volumes:
       - postgres_source_data:/var/lib/postgresql/data
-      - ./init_db:/docker-entrypoint-initdb.d   # Scripts SQL d'initialisation
+      - ./scripts:/docker-entrypoint-initdb.d  # Scripts SQL d'initialisation
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "sourceuser", "-d", "sourcedb"]
       interval: 10s

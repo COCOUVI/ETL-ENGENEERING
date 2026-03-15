@@ -1,101 +1,90 @@
 """
-Script de chargement (LOAD) des données RAW vers MinIO (S3 compatible)
+PHASE ETL : LOAD - Chargement des données RAW vers MinIO (S3 compatible)
 
-Rôle :
-- Parcourir les fichiers RAW locaux
-- Reproduire la même structure dans MinIO
-- Charger les fichiers JSON sans modification
-
-Phase ETL : LOAD
+Refactored with OOP pattern:
+- Utilise MinIOClient centralisé (plus de duplication)
+- Utilise ConfigManager (config unique)
+- Utilise Loader base class (contrat ETL)
+- Utilise Logger centralisé
 """
 
-import logging
 from pathlib import Path
-import boto3
-import os
-from botocore.exceptions import ClientError
-from dotenv import load_dotenv  
+from typing import Optional, Tuple
 
-# Charger les variables d'environnement du fichier .env
-load_dotenv(override=False)
+from core.base import Loader
+from core.config import ConfigManager
+from core.minio_client import MinIOClient
+from core.logger import get_logger, setup_logging
 
-# =========================
-# CONFIGURATION
-# =========================
-
-RAW_BASE_PATH= Path("/opt/airflow/data/bronze-layer/books")
+logger = get_logger(__name__)
 
 
-# Dans jobs/load/load_to_minio.py
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER")
-MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD")
-MINIO_BUCKET = "bronze-layer"
-
-# Logging standard industriel
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-# =========================
-# CONNEXION MINIO
-# =========================
-
-def get_s3_client():
+class BooksRawLoader(Loader):
     """
-    Crée un client S3 compatible MinIO
+    Loader pour fichiers RAW (JSON) de livres vers MinIO
+    
+    Rôle:
+    - Parcourir les fichiers RAW locaux (JSON)
+    - Reproduire la structure dans MinIO
+    - Charger les fichiers vers S3 compatible
+    
+    Remplace l'ancien load_to_minio.py procédural
     """
-    return boto3.client(
-        "s3",
-        endpoint_url=MINIO_ENDPOINT,
-        aws_access_key_id=MINIO_ACCESS_KEY,
-        aws_secret_access_key=MINIO_SECRET_KEY,
-    )
-
-# =========================
-# LOAD LOGIC
-# =========================
-
-def ensure_bucket_exists(s3_client):
-    """
-    Vérifie que le bucket existe, sinon le crée
-    """
-    try:
-        s3_client.head_bucket(Bucket=MINIO_BUCKET)
-        logging.info(f"Bucket '{MINIO_BUCKET}' already exists")
-    except ClientError:
-        s3_client.create_bucket(Bucket=MINIO_BUCKET)
-        logging.info(f"Bucket '{MINIO_BUCKET}' created")
-
-def upload_raw_files():
-    """
-    Upload tous les fichiers RAW locaux vers MinIO
-    en conservant la structure des dossiers
-    """
-    s3 = get_s3_client()
-    ensure_bucket_exists(s3)
-
-    # Parcours récursif des fichiers JSON
-    for file_path in RAW_BASE_PATH.rglob("*.json"):
-        # Chemin relatif pour recréer la structure dans MinIO
-        relative_path = file_path.relative_to(RAW_BASE_PATH)
-
-        s3_key = f"books/{relative_path}"
-
+    
+    def __init__(self, config: Optional[ConfigManager] = None):
+        """
+        Args:
+            config: ConfigManager instance (utilise singleton si None)
+        """
+        super().__init__(name="BooksRawLoader")
+        self.config = config or ConfigManager.get_instance()
+        self.minio = MinIOClient(self.config.minio)
+    
+    def load(self) -> bool:
+        """
+        Upload tous les fichiers JSON du dossier books vers MinIO
+        
+        Returns:
+            bool: True si tous les fichiers uploadés, False sinon
+        """
         try:
-            s3.upload_file(
-                Filename=str(file_path),
-                Bucket=MINIO_BUCKET,
-                Key=s3_key
+            # Étape 1: Vérifier/créer le bucket
+            self.minio.ensure_bucket_exists()
+            
+            # Étape 2: Déterminer le chemin source
+            source_dir = Path(self.config.paths.bronze_layer) / "books"
+            self.log_info(f"Source directory: {source_dir}")
+            
+            if not source_dir.exists():
+                self.log_warning(f"Directory not found: {source_dir}")
+                return False
+            
+            # Étape 3: Upload tous les fichiers JSON
+            uploaded, total = self.minio.upload_directory(
+                local_dir=source_dir,
+                s3_prefix="books/",
+                extension="*.json"
             )
-            logging.info(f"Uploaded {file_path} → s3://{MINIO_BUCKET}/{s3_key}")
+            
+            # Étape 4: Log résultats
+            success = uploaded == total
+            self.log_info(f"✓ Upload results: {uploaded}/{total} files successful")
+            
+            return success
+            
         except Exception as e:
-            logging.error(f"Failed to upload {file_path}: {e}")
+            self.log_error(f"Load failed: {e}")
+            return False
 
-# =========================
-# POINT D'ENTRÉE
-# =========================
 
 if __name__ == "__main__":
-    upload_raw_files()
+    # Setup logging (une fois au démarrage)
+    setup_logging()
+    
+    # Créer et exécuter le loader
+    loader = BooksRawLoader()
+    success = loader.execute()
+    
+    # Exit avec code approprié
+    import sys
+    sys.exit(0 if success else 1)

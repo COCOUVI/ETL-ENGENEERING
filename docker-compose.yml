@@ -10,6 +10,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    
+    PYTHONPATH: /opt/airflow
+
     # MinIO connection
     MINIO_ENDPOINT: ${MINIO_ENDPOINT}
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -22,6 +25,7 @@ x-airflow-common: &airflow-common
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
+    - ./core:/opt/airflow/core
     - ./plugins:/opt/airflow/plugins
     - ./spark_jobs:/opt/airflow/spark_jobs
     - ./extractors:/opt/airflow/extractors

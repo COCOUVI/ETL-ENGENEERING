@@ -29,12 +29,11 @@ class BooksRawTransformer(Transformer):
         super().__init__(name="BooksRawTransformer")
         self.config = config or ConfigManager.get_instance()
         self.minio = MinIOClient(self.config.minio)
-        self.spark_manager = SparkManager(self.config)
+        self.spark_manager = SparkManager(self.config.spark, self.config.minio)
         self.silver_bucket = "silver-layer"
         self.silver_prefix = "books/"
         self.silver_local = Path(self.config.paths.silver_layer) / "books"
-        # Chemin des JSON RAW sur MinIO (bronze layer)
-        self.bronze_books_path = f"s3a://{self.config.minio.bronze_bucket}/books/books_*.json"
+        self.bronze_books_path = f"s3a://{self.config.minio.bucket}/books/books_*.json"
 
     def transform(self) -> bool:
         """
@@ -121,7 +120,7 @@ class BooksRawTransformer(Transformer):
         minio_path = f"s3a://{self.silver_bucket}/{self.silver_prefix}"
 
         # (1) MinIO
-        s3_exists = self.minio.folder_exists(self.silver_prefix, self.silver_bucket)
+        s3_exists = self.minio.folder_exists(self.silver_bucket, self.silver_prefix)
         if not s3_exists:
             self.log_info(f"Writing silver data to {minio_path}")
             df_valid.write.mode("overwrite").parquet(minio_path)

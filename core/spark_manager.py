@@ -91,6 +91,7 @@ class SparkManager:
             .config("spark.default.parallelism", str(self.spark_config.shuffle_partitions))
         
         SparkManager._session = builder.getOrCreate()
+        SparkManager._session.sparkContext.setLogLevel("ERROR")
         SparkManager._session.sparkContext.setLogLevel(self.spark_config.log_level)
         
         logger.info(f"✓ SparkSession créée: {self.spark_config.app_name}")
@@ -101,7 +102,7 @@ class SparkManager:
     def _log_session_info(self) -> None:
         """Log les infos de la session Spark"""
         session = SparkManager._session
-        logger.info(f"  - Master: {session.sparkContext.master()}")
+        logger.info(f"  - Master: {session.sparkContext.master}")
         logger.info(f"  - App Name: {session.sparkContext.appName}")
         logger.info(f"  - Partitions: {self.spark_config.shuffle_partitions}")
         logger.info(f"  - S3A Endpoint: {self.minio_config.endpoint}")

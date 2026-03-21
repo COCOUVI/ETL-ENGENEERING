@@ -27,8 +27,8 @@ class BooksSQLTransformer(Transformer):
         self.silver_local = Path(self.config.paths.silver_layer) / "books_enriched"
         self.silver_s3 = "s3a://silver-layer/sql/books_enriched"
         # Spark Manager core
-        self.spark_manager = SparkManager(self.config)
-        # (Tu peux centraliser MinIO si besoin d'helper en plus !)
+        self.spark_manager = SparkManager()
+    
 
     def transform(self) -> bool:
         try:

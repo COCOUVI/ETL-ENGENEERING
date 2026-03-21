@@ -29,7 +29,7 @@ class BooksRawTransformer(Transformer):
         super().__init__(name="BooksRawTransformer")
         self.config = config or ConfigManager.get_instance()
         self.minio = MinIOClient(self.config.minio)
-        self.spark_manager = SparkManager(self.config.spark, self.config.minio)
+        self.spark_manager = SparkManager()
         self.silver_bucket = "silver-layer"
         self.silver_prefix = "books/"
         self.silver_local = Path(self.config.paths.silver_layer) / "books"

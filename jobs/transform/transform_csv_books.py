@@ -30,12 +30,12 @@ class BooksCSVTransformer(Transformer):
         super().__init__(name="BooksCSVTransformer")
         self.config = config or ConfigManager.get_instance()
         self.minio = MinIOClient(self.config.minio)
-        self.spark_manager = SparkManager(self.config)
+        self.spark_manager = SparkManager()
         self.silver_bucket = "silver-layer"
         self.silver_prefix = "csv-books/"
         self.silver_local = Path(self.config.paths.silver_layer) / "csv-books"
         # CSV sur MinIO (bronze)
-        self.bronze_books_path = f"s3a://{self.config.minio.bronze_bucket}/books/books_*.csv"
+        self.bronze_books_path = f"s3a://{self.config.minio.bucket}/books/books_*.csv"
         self.current_year = self.config.csv_transform_year if hasattr(self.config, "csv_transform_year") else 2026
 
     def transform(self) -> bool:
@@ -103,7 +103,7 @@ class BooksCSVTransformer(Transformer):
         minio_path = f"s3a://{self.silver_bucket}/{self.silver_prefix}"
 
         # MinIO
-        s3_exists = self.minio.folder_exists(self.silver_prefix, self.silver_bucket)
+        s3_exists = self.minio.folder_exists(self.silver_bucket, self.silver_prefix)
         if not s3_exists:
             self.log_info(f"Writing silver data to {minio_path}")
             df_clean.coalesce(1).write.mode("overwrite").parquet(minio_path)

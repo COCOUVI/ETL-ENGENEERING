@@ -3,3 +3,7 @@ beautifulsoup4
 boto3
 python-dotenv
 apache-airflow-providers-apache-spark
+pytest
+pytest-cov
+pytest-mock
+pandas

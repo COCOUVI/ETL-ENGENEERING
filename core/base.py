@@ -233,5 +233,11 @@ class Pipeline:
         self.logger.info(f"✓ Pipeline '{self.name}' complété avec succès")
         return True
     
+    def run(self) -> bool:
+        """
+        Alias for execute to match test expectations.
+        """
+        return self.execute()
+    
     def __repr__(self) -> str:
         return f"Pipeline(name={self.name}, stages={len(self.stages)})"

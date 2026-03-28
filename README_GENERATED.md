@@ -87,3 +87,9 @@ pytest tests/ --cov=core --cov=jobs --cov-report=term-missing
 Alexandro Cocouvi
 
 ---
+
+## Conseils pour la soumission
+
+- Nettoyer les dossiers de logs, caches, environnements virtuels et données générées.
+- Vérifier la complétude de la documentation et la clarté du code.
+- S'assurer que tous les tests passent et que la couverture reste >80%.

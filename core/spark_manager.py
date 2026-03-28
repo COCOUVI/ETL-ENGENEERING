@@ -99,6 +99,12 @@ class SparkManager:
         
         return SparkManager._session
     
+    def get_or_create_session(self) -> SparkSession:
+        """
+        Alias for get_session to match test expectations.
+        """
+        return self.get_session()
+    
     def _log_session_info(self) -> None:
         """Log les infos de la session Spark"""
         session = SparkManager._session

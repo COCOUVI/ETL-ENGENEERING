@@ -296,12 +296,16 @@ class TestMinIOClientListObjects:
 
     def test_list_objects_success(self, minio_client):
         """Test successful object listing"""
-        minio_client.client.list_objects_v2.return_value = {
-            'Contents': [
-                {'Key': 'books/file1.json'},
-                {'Key': 'books/file2.json'},
-            ]
-        }
+        mock_paginator = MagicMock()
+        mock_paginator.paginate.return_value = [
+            {
+                'Contents': [
+                    {'Key': 'books/file1.json'},
+                    {'Key': 'books/file2.json'},
+                ]
+            }
+        ]
+        minio_client.client.get_paginator.return_value = mock_paginator
         
         objects = minio_client.list_objects("books/")
         
@@ -310,7 +314,9 @@ class TestMinIOClientListObjects:
 
     def test_list_objects_empty(self, minio_client):
         """Test list_objects with empty result"""
-        minio_client.client.list_objects_v2.return_value = {}
+        mock_paginator = MagicMock()
+        mock_paginator.paginate.return_value = [{}]
+        minio_client.client.get_paginator.return_value = mock_paginator
         
         objects = minio_client.list_objects("empty/")
         

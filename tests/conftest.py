@@ -1,13 +1,28 @@
-
-import pytest
-import logging
-import tempfile
 import os
 import sys
+import tempfile
+import pytest
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 
 """Fixtures and configurations for tests"""
+
+# Create a temporary directory for tests
+TEST_TEMP_DIR = tempfile.mkdtemp(prefix="etl_test_")
+
+# Mock pyspark BEFORE any imports from core
+sys.modules['pyspark'] = MagicMock()
+sys.modules['pyspark.sql'] = MagicMock()
+sys.modules['pyspark.sql.functions'] = MagicMock()
+
+# Set environment variables to use temp directories BEFORE config import
+os.environ['CSV_SOURCE_PATH'] = os.path.join(TEST_TEMP_DIR, 'source', 'Books.csv')
+os.environ['BRONZE_LAYER_PATH'] = os.path.join(TEST_TEMP_DIR, 'bronze-layer')
+os.environ['SILVER_LAYER_PATH'] = os.path.join(TEST_TEMP_DIR, 'silver-layer')
+
+from core.config import ConfigManager, MinIOConfig, DatabaseConfig, SparkConfig, PathConfig
+from core.minio_client import MinIOClient
 
 # Fixture pour MinIOClient mocké (corrige les erreurs de fixture manquante)
 @pytest.fixture
@@ -18,24 +33,6 @@ def minio_client(minio_config):
         client = MinIOClient(minio_config)
         client._client = mock_s3
         yield client
-
-# Mock pyspark before importing core modules
-sys.modules['pyspark'] = MagicMock()
-sys.modules['pyspark.sql'] = MagicMock()
-sys.modules['pyspark.sql.functions'] = MagicMock()
-
-# Mock os.makedirs to prevent permission issues during config loading
-original_makedirs = os.makedirs
-def mock_makedirs(*args, **kwargs):
-    """Mock makedirs that doesn't fail on /opt/airflow"""
-    path = args[0] if args else None
-    if path and '/opt/airflow' in str(path):
-        return  # Skip actual creation
-    return original_makedirs(*args, **kwargs)
-
-os.makedirs = mock_makedirs
-
-from core.config import ConfigManager, MinIOConfig, DatabaseConfig, SparkConfig, PathConfig
 
 
 @pytest.fixture

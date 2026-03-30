@@ -1,12 +1,5 @@
 # Data Engineering ETL Project
 
-## 📌 Information Importante
-
-**Projet de Formation** - Travail autonome réalisé par un seul développeur  
-**Destiné à :** Remise au tuteur pour évaluation  
-**Statut :** ✅ Complété et testé (couverture >80%)
-
----
 
 ## Structure du projet
 
